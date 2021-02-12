@@ -3,6 +3,9 @@ from numpy.linalg import det, lstsq, norm
 from cv2 import resize, GaussianBlur, subtract, KeyPoint, INTER_LINEAR, INTER_NEAREST
 from functools import cmp_to_key
 import logging
+import sys
+sys.path.insert(0,"../src/")
+import extraction as ex
 
 ####################
 # Global variables #
@@ -331,7 +334,7 @@ def unpackOctave(keypoint):
     scale = 1 / float32(1 << octave) if octave >= 0 else float32(1 << -octave)
     return octave, layer, scale
 
-def generateDescriptors(keypoints, gaussian_images, window_width=4, num_bins=8, scale_multiplier=3, descriptor_max_value=0.2):
+def generateDescriptors(keypoints, gaussian_images, hist_p1,hist_p2,delta,d,sig, window_width=4, num_bins=8, scale_multiplier=3, descriptor_max_value=0.2):
     """Generate descriptors for each keypoint
     """
     logger.debug('Generating descriptors...')
@@ -375,7 +378,15 @@ def generateDescriptors(keypoints, gaussian_images, window_width=4, num_bins=8, 
                         weight = exp(weight_multiplier * ((row_rot / hist_width) ** 2 + (col_rot / hist_width) ** 2))
                         row_bin_list.append(row_bin)
                         col_bin_list.append(col_bin)
-                        magnitude_list.append(weight * gradient_magnitude)
+
+                        # Suppression
+                        if gradient_orientation > 180:
+                            peak = hist_p1
+                        else:
+                            peak = hist_p2
+                        s = ex.gaus_suppress(delta,d,gradient_orientation,peak,sig)
+
+                        magnitude_list.append(weight * s * gradient_magnitude)
                         orientation_bin_list.append((gradient_orientation - angle) * bins_per_degree)
 
         for row_bin, col_bin, magnitude, orientation_bin in zip(row_bin_list, col_bin_list, magnitude_list, orientation_bin_list):
